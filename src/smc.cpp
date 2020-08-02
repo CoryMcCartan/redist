@@ -14,7 +14,8 @@
  * population deviation is within `tol`
  */
 IntegerMatrix smc_plans(int N, List l, const uvec &counties,
-                        const uvec &pop, int n_distr, double tol,
+                        const uvec &pop, int n_distr,
+			double w_a, double tol,
                         double gamma, NumericVector &log_prob, double thresh,
                         double alpha, int infl, int verbosity) {
     Graph g = list_to_graph(l);
@@ -28,9 +29,11 @@ IntegerMatrix smc_plans(int N, List l, const uvec &counties,
     if (verbosity >= 1) {
         Rcout << "Sampling " << N << " " << V << "-unit maps with " << n_distr
               << " districts and population tolerance " << tol*100 << "%.\n";
-        if (cg.size() > 1)
+        if (cg.size() > 1 && w_a == 0)
             Rcout << "Ensuring no more than " << n_distr - 1 << " splits of the "
                   << cg.size() << " administrative units.\n";
+	if (w_a > 0)
+	  Rcout << "Constraining administrative unit splits with weight of " << w_a <<".\n";
     }
 
     vec pop_left(N_max);
@@ -47,8 +50,13 @@ IntegerMatrix smc_plans(int N, List l, const uvec &counties,
             Rcout << "Making split " << ctr << " of " << n_distr-1 << "\n";
 
         // find k and multipliers
-        adapt_parameters(g, k, prob, N_adapt, valid, lp, thresh, tol, districts,
-                         counties, cg, pop, pop_left, distr_pop);
+	if (w_a > 0) {
+	  adapt_parameters(g, k, prob, N_adapt, valid, lp, thresh, tol, districts,
+			   ones<uvec>(counties.n_elem), cg, pop, pop_left, distr_pop);
+	}else{
+	  adapt_parameters(g, k, prob, N_adapt, valid, lp, thresh, tol, districts,
+			   counties, cg, pop, pop_left, distr_pop);
+	}
 
         int N_new = std::ceil(N / prob);
         if (ctr == n_distr - 1) // safety margin for last step
@@ -64,7 +72,7 @@ IntegerMatrix smc_plans(int N, List l, const uvec &counties,
         N_sample = N_new;
 
         // perform sampling
-        split_maps(g, counties, cg, pop, districts, lp, pop_left, N_sample,
+        split_maps(g, counties, cg, pop, districts, lp, pop_left, w_a, N_sample,
                    n_distr, ctr, distr_pop, tol, gamma, k, verbosity);
         valid = 0;
         for (int i = 0; i < N_sample; i++) {
@@ -125,6 +133,7 @@ void resample_maps(int N_sample, int N_new, double alpha, umat &districts,
  */
 void split_maps(const Graph &g, const uvec &counties, Multigraph &cg,
                 const uvec &pop, umat &districts, vec &lp, vec &pop_left,
+		double w_a,
                 int N, int n_distr, int dist_ctr, double distr_pop, double tol,
                 double gamma, int k, int verbosity) {
     // absolute bounds for district populations
@@ -139,10 +148,16 @@ void split_maps(const Graph &g, const uvec &counties, Multigraph &cg,
         double lower_s = std::max(lower, pop_left(i) - new_size * upper);
         double upper_s = std::min(upper, pop_left(i) - new_size * lower);
         // split
-        double inc_lp = split_map(g, counties, cg, districts.col(i), dist_ctr,
-                          pop, pop_left(i), lower_s, upper_s, distr_pop, k);
+	double inc_lp;
+	if (w_a > 0){
+	  inc_lp = split_map(g, ones<uvec>(counties.n_elem), cg, districts.col(i), dist_ctr,
+			     pop, pop_left(i), lower_s, upper_s, distr_pop, k);
+	}else{
+	  inc_lp = split_map(g, counties, cg, districts.col(i), dist_ctr,
+			     pop, pop_left(i), lower_s, upper_s, distr_pop, k);
+	}
 
-        if (gamma != 1 && std::isfinite(inc_lp)) {
+        if (gamma != 1 && std::isfinite(inc_lp) && w_a == 0) {
             double log_st = 0;
             for (int j = 1; j <= n_cty; j++) {
                 log_st += log_st_distr(g, districts, counties, i, dist_ctr, j);
@@ -158,8 +173,17 @@ void split_maps(const Graph &g, const uvec &counties, Multigraph &cg,
 
             inc_lp += (1 - gamma) * log_st;
         }
-        lp(i) += inc_lp;
 
+	// Administrative unit split soft constraint
+	if (w_a > 0 && std::isfinite(inc_lp)) {
+	  // Rcpp::Rcout << "Initial log probability: " << inc_lp << std::endl;
+	  int num_split_admin = calc_split_admin(districts, counties, i, dist_ctr);
+	  // Rcpp::Rcout << "Number of split counties: " << num_split_admin << std::endl;
+	  // Rcpp::Rcout << "Increment log prob by " << w_a * num_split_admin << std::endl;
+	  inc_lp += -1.0 * w_a * num_split_admin;
+	}
+	
+	lp(i) += inc_lp;
         // `lower_s` now contains the population of the newly-split district
         pop_left(i) -= lower_s;
 
@@ -174,6 +198,30 @@ void split_maps(const Graph &g, const uvec &counties, Multigraph &cg,
     for (int i = N; i < N_max; i++) {
         lp(i) = -log(0.0);
     }
+}
+
+/*
+ * Count number of split counties for soft constraint
+ */
+int calc_split_admin(const umat &districts, const uvec &admin,
+		     int idx, int district) {
+  
+  uvec precs_in_dist = find(districts.col(idx) == district);
+  uvec admin_in_dist = unique(admin.elem(precs_in_dist));
+  int admin_split_counter = 0;
+  
+  for (int j = 0; j < admin_in_dist.n_elem; j++) {
+    uvec precs_in_admin = find(districts.col(idx) == admin_in_dist(j));
+    for (int k = 0; k < precs_in_admin.n_elem; k++) {
+      if (!any(precs_in_dist == precs_in_admin(k))) {
+	admin_split_counter++;
+	break;
+      }
+    }
+  }
+
+  return admin_split_counter;
+  
 }
 
 /*

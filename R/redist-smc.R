@@ -49,6 +49,8 @@
 #' @param resample Whether to perform a final resampling step so that the
 #' generated plans can be used immediately.  Set this to \code{FALSE} to perform
 #' direct importance sampling estimates, or to adjust the weights manually.
+#' @param constraint_wt A vector of positive weights, which are applied to each iteration-split
+#' to sample from a specified target energy defined by substantive constraints.
 #' @param constraint_fn A function which takes in a matrix where each column is
 #'  a redistricting plan and outputs a vector of log-weights, which will be
 #'  added the the final weights.
@@ -96,6 +98,7 @@
 #' @export
 redist.smc = function(adjobj, popvec, nsims, ndists, counties=NULL,
                       popcons=0.01, compactness=1, resample=TRUE,
+                      constraint_wt=0,
                       constraint_fn=function(m) rep(0, ncol(m)),
                       adapt_k_thresh=0.95, seq_alpha=0.1+0.2*compactness,
                       truncate=(compactness != 1),
@@ -114,6 +117,8 @@ redist.smc = function(adjobj, popvec, nsims, ndists, counties=NULL,
         stop("`seq_alpha` parameter must lie in (0, 1].")
     if (nsims < 1)
         stop("`nsims` must be positive.")
+    if (any(constraint_wt < 0))
+        stop("All weights in `constraint_wt` must be positive.")
 
     if (missing(counties)) counties = rep(1, V)
     if (length(unique(counties)) != max(counties))
@@ -130,8 +135,9 @@ redist.smc = function(adjobj, popvec, nsims, ndists, counties=NULL,
     if (silent) verbosity = 0
 
     lp = rep(0, nsims)
-    maps = smc_plans(nsims, adjlist, counties, popvec, ndists, popcons, compactness,
-                     lp, adapt_k_thresh, seq_alpha, max_oversample, verbosity);
+    maps = smc_plans(nsims, adjlist, counties, popvec, ndists, constraint_wt,
+                     popcons, compactness, lp, adapt_k_thresh, seq_alpha,
+                     max_oversample, verbosity);
 
     N_ok = ncol(maps)
     dev = max_dev(maps, popvec, ndists)

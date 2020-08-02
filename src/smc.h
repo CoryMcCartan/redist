@@ -16,7 +16,7 @@
  */
 // [[Rcpp::export]]
 IntegerMatrix smc_plans(int N, List l, const arma::uvec &counties,
-                        const arma::uvec &pop, int n_distr, double tol,
+                        const arma::uvec &pop, int n_distr, double w_a, double tol,
                         double gamma, NumericVector &log_prob, double thresh,
                         double alpha, int infl=5, int verbosity=1);
 
@@ -25,6 +25,7 @@ IntegerMatrix smc_plans(int N, List l, const arma::uvec &counties,
  */
 void split_maps(const Graph &g, const uvec &counties, Multigraph &cg,
                 const uvec &pop, umat &districts, vec &lp, vec &pop_left,
+		double w_a,
                 int N, int n_distr, int dist_ctr, double distr_pop, double tol,
                 double gamma, int k, int verbosity);
 
@@ -56,5 +57,11 @@ void adapt_parameters(const Graph &g, int &k, double &prob, int N_adapt, int val
                       const umat &districts, const uvec &counties,
                       Multigraph &cg, const uvec &pop,
                       const vec &pop_left, double target);
+
+/* 
+ * Calculate number of split counties for soft constraint
+ */
+int calc_split_admin(const umat &districts, const uvec &admin,
+		     int idx, int district);
 
 #endif

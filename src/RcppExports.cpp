@@ -158,8 +158,8 @@ BEGIN_RCPP
 END_RCPP
 }
 // smc_plans
-IntegerMatrix smc_plans(int N, List l, const arma::uvec& counties, const arma::uvec& pop, int n_distr, double tol, double gamma, NumericVector& log_prob, double thresh, double alpha, int infl, int verbosity);
-RcppExport SEXP _redist_smc_plans(SEXP NSEXP, SEXP lSEXP, SEXP countiesSEXP, SEXP popSEXP, SEXP n_distrSEXP, SEXP tolSEXP, SEXP gammaSEXP, SEXP log_probSEXP, SEXP threshSEXP, SEXP alphaSEXP, SEXP inflSEXP, SEXP verbositySEXP) {
+IntegerMatrix smc_plans(int N, List l, const arma::uvec& counties, const arma::uvec& pop, int n_distr, double wc, double tol, double gamma, NumericVector& log_prob, double thresh, double alpha, int infl, int verbosity);
+RcppExport SEXP _redist_smc_plans(SEXP NSEXP, SEXP lSEXP, SEXP countiesSEXP, SEXP popSEXP, SEXP n_distrSEXP, SEXP wcSEXP, SEXP tolSEXP, SEXP gammaSEXP, SEXP log_probSEXP, SEXP threshSEXP, SEXP alphaSEXP, SEXP inflSEXP, SEXP verbositySEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -168,6 +168,7 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< const arma::uvec& >::type counties(countiesSEXP);
     Rcpp::traits::input_parameter< const arma::uvec& >::type pop(popSEXP);
     Rcpp::traits::input_parameter< int >::type n_distr(n_distrSEXP);
+    Rcpp::traits::input_parameter< double >::type wc(wcSEXP);
     Rcpp::traits::input_parameter< double >::type tol(tolSEXP);
     Rcpp::traits::input_parameter< double >::type gamma(gammaSEXP);
     Rcpp::traits::input_parameter< NumericVector& >::type log_prob(log_probSEXP);
@@ -175,7 +176,7 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< double >::type alpha(alphaSEXP);
     Rcpp::traits::input_parameter< int >::type infl(inflSEXP);
     Rcpp::traits::input_parameter< int >::type verbosity(verbositySEXP);
-    rcpp_result_gen = Rcpp::wrap(smc_plans(N, l, counties, pop, n_distr, tol, gamma, log_prob, thresh, alpha, infl, verbosity));
+    rcpp_result_gen = Rcpp::wrap(smc_plans(N, l, counties, pop, n_distr, wc, tol, gamma, log_prob, thresh, alpha, infl, verbosity));
     return rcpp_result_gen;
 END_RCPP
 }
